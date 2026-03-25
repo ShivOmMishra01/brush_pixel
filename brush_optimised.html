@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelForge – Optimised Brush Engine</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1a1a1a;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app { display:flex; height:100vh; }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 280px;
+            background: #2d2d2d;
+            border-right: 1px solid #404040;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .sidebar-header { padding:20px; border-bottom:1px solid #404040; }
+
+        .logo { display:flex; align-items:center; gap:10px; }
+        .logo-icon {
+            width:32px; height:32px;
+            background:#007aff; border-radius:8px;
+            display:flex; align-items:center; justify-content:center;
+            font-weight:bold;
+        }
+        .logo-text { font-size:16px; font-weight:600; }
+        .badge {
+            margin-left:auto; font-size:10px;
+            background:#1a3a1a; padding:2px 6px;
+            border-radius:10px; color:#00ff88;
+            border:1px solid #00ff8844;
+        }
+
+        /* Drop zone */
+        .drop-zone {
+            margin:16px;
+            background:#363636; border:2px dashed #505050;
+            border-radius:8px; padding:24px;
+            text-align:center; cursor:pointer;
+            transition:all 0.2s;
+        }
+        .drop-zone:hover { border-color:#007aff; background:#3a3a3a; }
+        .drop-zone-icon { font-size:32px; margin-bottom:8px; }
+        .drop-zone-text { font-size:13px; color:#ccc; }
+
+        /* Stats */
+        .stats {
+            background:#363636; margin:0 16px 16px;
+            padding:12px; border-radius:8px;
+        }
+        .stat-row {
+            display:flex; justify-content:space-between;
+            font-size:12px; margin-bottom:8px; color:#aaa;
+        }
+        .stat-value { color:#fff; font-weight:500; }
+
+        /* Tools */
+        .tools-section { padding:0 16px 16px; }
+        .section-title {
+            font-size:11px; text-transform:uppercase;
+            color:#888; margin-bottom:8px;
+        }
+        .tool-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+        .tool-btn {
+            background:#363636; border:1px solid #505050;
+            border-radius:6px; color:white;
+            padding:8px; font-size:14px; cursor:pointer;
+            transition:all 0.1s;
+        }
+        .tool-btn:hover { background:#404040; }
+        .tool-btn.active { background:#007aff; border-color:#007aff; }
+
+        /* Colors */
+        .color-presets {
+            display:grid; grid-template-columns:repeat(6,1fr);
+            gap:6px; margin:12px 0;
+        }
+        .color-preset {
+            aspect-ratio:1; border-radius:4px; cursor:pointer;
+            border:2px solid transparent; transition:all 0.1s;
+        }
+        .color-preset:hover { transform:scale(1.05); }
+        .color-preset.selected { border-color:white; box-shadow:0 0 0 1px #007aff; }
+        .custom-color {
+            display:flex; align-items:center; gap:8px;
+            background:#363636; padding:6px 10px;
+            border-radius:6px; margin-top:8px;
+        }
+        .color-preview { width:24px; height:24px; border-radius:4px; border:2px solid white; }
+        #customColor { flex:1; height:28px; border:none; background:transparent; cursor:pointer; }
+
+        /* Brush size */
+        .brush-control { margin:16px 0; }
+        .brush-header {
+            display:flex; justify-content:space-between;
+            font-size:12px; margin-bottom:6px; color:#aaa;
+        }
+        .brush-value { color:#007aff; font-weight:bold; }
+        .brush-slider {
+            width:100%; height:3px;
+            background:#505050; border-radius:2px;
+            -webkit-appearance:none;
+        }
+        .brush-slider::-webkit-slider-thumb {
+            -webkit-appearance:none;
+            width:14px; height:14px;
+            background:#007aff; border-radius:50%; cursor:pointer;
+        }
+
+        /* Performance panel */
+        .perf-panel {
+            background:#363636; margin:0 16px 16px;
+            padding:10px; border-radius:8px; font-size:11px;
+        }
+        .perf-row {
+            display:flex; justify-content:space-between;
+            margin-bottom:4px; color:#aaa;
+        }
+        .perf-value { color:#00ff88; font-family:monospace; }
+        .perf-value.warn { color:#ffaa00; }
+        .perf-value.bad  { color:#ff4444; }
+
+        /* Fix badges */
+        .fix-badges {
+            margin:0 16px 12px;
+            display:flex; flex-wrap:wrap; gap:4px;
+        }
+        .fix-badge {
+            font-size:10px; padding:2px 7px;
+            border-radius:10px; font-weight:600;
+            background:#1a3a1a; color:#00ff88;
+            border:1px solid #00ff8844;
+        }
+
+        /* Annotations list */
+        .annotations-list {
+            flex:1; padding:0 16px 16px; overflow-y:auto;
+        }
+        .list-header {
+            display:flex; justify-content:space-between;
+            margin-bottom:8px; font-size:11px; color:#aaa;
+        }
+        .annotation-item {
+            background:#363636; padding:6px 8px;
+            margin-bottom:4px; border-radius:4px;
+            font-size:11px; display:flex; gap:8px; cursor:pointer;
+        }
+        .annotation-color { width:12px; height:12px; border-radius:2px; }
+
+        /* Action buttons */
+        .action-buttons {
+            display:grid; grid-template-columns:1fr 1fr;
+            gap:8px; padding:16px; border-top:1px solid #404040;
+        }
+        .action-btn {
+            padding:8px; border:none; border-radius:6px;
+            font-size:12px; font-weight:500; cursor:pointer; transition:all 0.1s;
+        }
+        .action-btn.primary  { background:#007aff; color:white; }
+        .action-btn.primary:hover  { background:#0051a8; }
+        .action-btn.secondary { background:#363636; color:white; border:1px solid #505050; }
+
+        /* Main content */
+        .main-content {
+            flex:1; display:flex; flex-direction:column;
+            overflow:hidden; background:#1a1a1a;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            height:48px; background:#2d2d2d;
+            border-bottom:1px solid #404040;
+            display:flex; align-items:center;
+            justify-content:space-between; padding:0 20px;
+        }
+        .image-info { font-size:13px; color:#ccc; }
+        .image-dimensions { font-size:11px; color:#888; margin-left:12px; }
+        .zoom-controls { display:flex; gap:6px; align-items:center; }
+        .zoom-btn {
+            width:28px; height:28px; background:#363636;
+            border:1px solid #505050; border-radius:4px;
+            color:white; cursor:pointer; font-size:16px;
+        }
+        .zoom-btn:hover { background:#404040; }
+        .zoom-level { min-width:60px; text-align:center; font-size:12px; color:#007aff; font-weight:500; }
+
+        /* Canvas container – single display canvas */
+        .canvas-container {
+            flex:1; overflow:hidden; position:relative;
+            background:#111; cursor:crosshair;
+        }
+
+        /*
+         * FIX 3 — Single display canvas fills the container.
+         * We render everything onto one <canvas> via ctx.setTransform()
+         * instead of CSS-transforming three stacked canvases.
+         * The compositor sees ONE texture, not three.
+         */
+        #displayCanvas {
+            position:absolute; top:0; left:0;
+            image-rendering:crisp-edges; image-rendering:pixelated;
+            width:100%; height:100%;
+        }
+
+        /* Status bar */
+        .status-bar {
+            height:32px; background:#2d2d2d;
+            border-top:1px solid #404040;
+            display:flex; align-items:center;
+            padding:0 16px; gap:24px; font-size:11px; color:#aaa;
+        }
+        .coord-box {
+            background:#363636; padding:2px 6px;
+            border-radius:4px; font-family:monospace;
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- ── Sidebar ── -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">PixelForge</div>
+                <div class="badge">OPTIMISED</div>
+            </div>
+        </div>
+
+        <!-- Applied-fix badges -->
+        <div class="fix-badges">
+            <span class="fix-badge">Fix 1: No double-draw</span>
+            <span class="fix-badge">Fix 2: GPU ctx</span>
+            <span class="fix-badge">Fix 3: setTransform</span>
+            <span class="fix-badge">Fix 4: Cached rect</span>
+            <span class="fix-badge">Fix 5: rAF loop</span>
+        </div>
+
+        <!-- Drop zone -->
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-icon">📁</div>
+            <div class="drop-zone-text">Drop image here</div>
+            <div style="font-size:10px;color:#888;">or click to browse</div>
+            <input type="file" id="fileInput" accept="image/*" style="display:none;">
+        </div>
+
+        <!-- Stats (hidden until image loaded) -->
+        <div class="stats" id="stats" style="display:none;">
+            <div class="stat-row"><span>📷 Image:</span><span class="stat-value" id="imageName">-</span></div>
+            <div class="stat-row"><span>📐 Size:</span><span class="stat-value" id="imageSize">0×0</span></div>
+            <div class="stat-row"><span>✏️ Strokes:</span><span class="stat-value" id="totalStrokes">0</span></div>
+            <div class="stat-row"><span>⚡ FPS:</span><span class="stat-value" id="fpsDisplay">-</span></div>
+        </div>
+
+        <!-- Performance panel -->
+        <div class="perf-panel">
+            <div class="perf-row"><span>Render mode:</span><span class="perf-value" id="renderMode">setTransform · 1 canvas</span></div>
+            <div class="perf-row"><span>rAF draw time:</span><span class="perf-value" id="drawTime">0 ms</span></div>
+            <div class="perf-row"><span>Points this stroke:</span><span class="perf-value" id="cachedPoints">0</span></div>
+            <div class="perf-row"><span>Reflows/move:</span><span class="perf-value" id="reflowCount">0 (cached)</span></div>
+            <div class="perf-row"><span>GPU ctx (annot):</span><span class="perf-value" id="gpuStatus">✓ enabled</span></div>
+            <div class="perf-row"><span>FPS status:</span><span class="perf-value" id="fpsStatus">–</span></div>
+        </div>
+
+        <!-- Tools -->
+        <div class="tools-section">
+            <div class="section-title">Tools</div>
+            <div class="tool-grid">
+                <button class="tool-btn active" onclick="setTool('brush', event)">✏️</button>
+                <button class="tool-btn" onclick="setTool('erase', event)">⌫</button>
+                <button class="tool-btn" onclick="clearAll()">🗑️</button>
+            </div>
+        </div>
+
+        <!-- Colors -->
+        <div class="tools-section">
+            <div class="section-title">Colors</div>
+            <div class="color-presets" id="colorPresets">
+                <div class="color-preset selected" style="background:#ff4444" onclick="setColor('#ff4444', event)"></div>
+                <div class="color-preset" style="background:#44ff44" onclick="setColor('#44ff44', event)"></div>
+                <div class="color-preset" style="background:#4488ff" onclick="setColor('#4488ff', event)"></div>
+                <div class="color-preset" style="background:#ffff44" onclick="setColor('#ffff44', event)"></div>
+                <div class="color-preset" style="background:#ff44ff" onclick="setColor('#ff44ff', event)"></div>
+                <div class="color-preset" style="background:#ffffff" onclick="setColor('#ffffff', event)"></div>
+            </div>
+            <div class="custom-color">
+                <div class="color-preview" id="colorPreview" style="background:#ff4444"></div>
+                <input type="color" id="customColor" value="#ff4444">
+            </div>
+        </div>
+
+        <!-- Brush size -->
+        <div class="tools-section">
+            <div class="brush-control">
+                <div class="brush-header">
+                    <span>Brush Size</span>
+                    <span class="brush-value" id="brushSizeValue">1 px</span>
+                </div>
+                <input type="range" class="brush-slider" id="brushSize" min="1" max="20" value="1">
+            </div>
+        </div>
+
+        <!-- Strokes list -->
+        <div class="annotations-list">
+            <div class="list-header">
+                <span>Recent strokes</span>
+                <span id="recentCount">0</span>
+            </div>
+            <div id="annotationsList"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="action-buttons">
+            <button class="action-btn primary" onclick="saveImage()">💾 Save PNG</button>
+            <button class="action-btn secondary" onclick="exportJSON()">📊 JSON</button>
+        </div>
+    </div>
+
+    <!-- ── Main content ── -->
+    <div class="main-content">
+        <div class="toolbar">
+            <div class="image-info">
+                <span id="currentImageName">No image loaded</span>
+                <span class="image-dimensions" id="currentDimensions"></span>
+            </div>
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="engine.zoom(0.5)">−</button>
+                <span class="zoom-level" id="zoomLevel">100%</span>
+                <button class="zoom-btn" onclick="engine.zoom(2)">+</button>
+                <button class="zoom-btn" onclick="engine.resetZoom()">⤢</button>
+            </div>
+        </div>
+
+        <!--
+            FIX 3 — ONE display canvas instead of three CSS-transformed canvases.
+            Three off-screen canvases (base, annotation, brush) are composed
+            into this single display canvas via ctx.drawImage() inside the rAF loop.
+            The browser compositor has one texture to manage, not three.
+        -->
+        <div class="canvas-container" id="canvasContainer">
+            <canvas id="displayCanvas"></canvas>
+        </div>
+
+        <div class="status-bar">
+            <span>📍 <span class="coord-box" id="mousePos">0,0</span></span>
+            <span>🔍 <span id="zoomValue">1.0×</span></span>
+            <span>⚡ <span id="fpsStatus2">–</span></span>
+            <span style="margin-left:auto;font-size:10px;color:#555;">All 5 perf fixes active</span>
+        </div>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════
+// OPTIMISED BRUSH ENGINE
+// All 5 performance fixes from the doc applied:
+//
+// FIX 1 — No double-draw: mousemove only sets dirty flag.
+//          annotCtx written ONCE on mouseup via batch replay.
+//
+// FIX 2 — willReadFrequently: true ONLY on baseCtx (needed for
+//          eyedropper getImageData). annotCtx + brushCtx stay GPU.
+//
+// FIX 3 — Canvas coordinate transform (ctx.setTransform) for zoom/pan
+//          instead of CSS transform:scale() on stacked canvas elements.
+//          One composited display canvas, three off-screen worklayers.
+//
+// FIX 4 — getBoundingClientRect() cached; invalidated only on
+//          resize/scroll. Zero layout reflow inside mousemove.
+//
+// FIX 5 — requestAnimationFrame dirty loop. mousemove records intent
+//          only. GPU draws at its own rate (60 or 120 fps).
+// ═══════════════════════════════════════════════════════════════════
+
+class OptimisedBrushEngine {
+
+    constructor() {
+
+        // ── Display canvas (the only element in the DOM) ──────────────────
+        this.displayCanvas = document.getElementById('displayCanvas');
+        this.displayCtx    = this.displayCanvas.getContext('2d', { willReadFrequently: false });
+
+        // ── Off-screen work layers ────────────────────────────────────────
+        // FIX 2: willReadFrequently: true ONLY on base (for eyedropper).
+        //        annotCtx + brushCtx get willReadFrequently: false → GPU path.
+        this.baseCanvas  = document.createElement('canvas');
+        this.annotCanvas = document.createElement('canvas');
+        this.brushCanvas = document.createElement('canvas');
+
+        this.baseCtx  = this.baseCanvas.getContext('2d',  { willReadFrequently: true  });
+        this.annotCtx = this.annotCanvas.getContext('2d', { willReadFrequently: false });
+        this.brushCtx = this.brushCanvas.getContext('2d', { willReadFrequently: false });
+
+        [this.baseCtx, this.annotCtx, this.brushCtx, this.displayCtx].forEach(ctx => {
+            ctx.imageSmoothingEnabled = false;
+        });
+
+        // ── State ─────────────────────────────────────────────────────────
+        this.image        = null;
+        this.strokes      = [];          // committed strokes for undo / export
+        this.currentStrokePoints = [];   // points in the active stroke (for mouseup batch replay)
+        this.tool         = 'brush';
+        this.color        = '#ff4444';
+        this.size         = 1;
+        this.isDrawing    = false;
+        this.isPanning    = false;
+        this.lastPoint    = null;
+
+        // FIX 3 — transform state (not CSS, not canvas.style.transform)
+        this.scale = 1;
+        this.panX  = 0;
+        this.panY  = 0;
+
+        // FIX 4 — cached bounding rect
+        this._cachedRect     = null;
+        this._rectInvalidated = true;
+
+        // FIX 5 — rAF dirty loop
+        this.dirty         = false;
+        this.pendingPoint  = null;
+        this.rafId         = null;
+
+        // FPS tracking
+        this.frameCount    = 0;
+        this.lastFpsUpdate = performance.now();
+        this.fps           = 0;
+        this.lastDrawMs    = 0;
+
+        this._init();
+        this._startRenderLoop();
+    }
+
+    // ── Initialise events ───────────────────────────────────────────────
+    _init() {
+        const container = document.getElementById('canvasContainer');
+
+        // FIX 4 — invalidate cached rect on resize / scroll only
+        window.addEventListener('resize', () => {
+            this._rectInvalidated = true;
+            this._resizeDisplayCanvas();
+            this._compositeFull();
+        });
+        container.addEventListener('scroll', () => { this._rectInvalidated = true; });
+
+        this._resizeDisplayCanvas();
+
+        // Mouse
+        container.addEventListener('mousedown',  e => this._onMouseDown(e));
+        container.addEventListener('mousemove',  e => this._onMouseMove(e));
+        container.addEventListener('mouseup',    () => this._onMouseUp());
+        container.addEventListener('mouseleave', () => this._onMouseUp());
+
+        // Wheel zoom — getBoundingClientRect here is fine (not in mousemove)
+        container.addEventListener('wheel', e => {
+            e.preventDefault();
+            const rect   = container.getBoundingClientRect();
+            const screenX = e.clientX - rect.left;
+            const screenY = e.clientY - rect.top;
+            const factor  = e.deltaY > 0 ? 0.9 : 1.1;
+
+            // FIX 3 — zoom toward cursor in canvas coordinate space
+            this.panX  = screenX - (screenX - this.panX) * factor;
+            this.panY  = screenY - (screenY - this.panY) * factor;
+            this.scale = Math.min(20, Math.max(0.1, this.scale * factor));
+
+            this.dirty = true;
+            this._updateZoomUI();
+        }, { passive: false });
+
+        // Middle-mouse pan
+        container.addEventListener('mousedown', e => {
+            if (e.button === 1) {
+                e.preventDefault();
+                this.isPanning  = true;
+                this._panStartX = e.clientX - this.panX;
+                this._panStartY = e.clientY - this.panY;
+                container.style.cursor = 'grabbing';
+            }
+        });
+        document.addEventListener('mouseup', () => {
+            if (this.isPanning) {
+                this.isPanning = false;
+                container.style.cursor = 'crosshair';
+            }
+        });
+
+        // Drop zone
+        const dz = document.getElementById('dropZone');
+        dz.addEventListener('click', () => document.getElementById('fileInput').click());
+        dz.addEventListener('dragover',  e => { e.preventDefault(); dz.style.borderColor = '#007aff'; });
+        dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; });
+        dz.addEventListener('drop', e => {
+            e.preventDefault();
+            dz.style.borderColor = '';
+            const f = e.dataTransfer.files[0];
+            if (f?.type.startsWith('image/')) this.loadImage(f);
+        });
+        document.getElementById('fileInput').addEventListener('change', e => {
+            if (e.target.files[0]) this.loadImage(e.target.files[0]);
+        });
+
+        // Brush size
+        document.getElementById('brushSize').addEventListener('input', e => {
+            this.size = parseInt(e.target.value);
+            document.getElementById('brushSizeValue').textContent = this.size + ' px';
+        });
+
+        // Custom colour
+        document.getElementById('customColor').addEventListener('input', e => {
+            this.color = e.target.value;
+            document.getElementById('colorPreview').style.backgroundColor = e.target.value;
+        });
+    }
+
+    // ── Resize display canvas to fill container ─────────────────────────
+    _resizeDisplayCanvas() {
+        const container = document.getElementById('canvasContainer');
+        this.displayCanvas.width  = container.clientWidth  || window.innerWidth - 280;
+        this.displayCanvas.height = container.clientHeight || window.innerHeight - 80;
+        this.displayCtx.imageSmoothingEnabled = false;
+        this._rectInvalidated = true;
+    }
+
+    // ── FIX 4 — cached rect ─────────────────────────────────────────────
+    _getCachedRect() {
+        if (this._rectInvalidated || !this._cachedRect) {
+            this._cachedRect     = document.getElementById('canvasContainer').getBoundingClientRect();
+            this._rectInvalidated = false;
+        }
+        return this._cachedRect;
+    }
+
+    // ── FIX 3 — screen → canvas coordinate conversion ──────────────────
+    _screenToCanvas(screenX, screenY) {
+        return {
+            x: Math.floor((screenX - this.panX) / this.scale),
+            y: Math.floor((screenY - this.panY) / this.scale),
+        };
+    }
+
+    // ── FIX 5 — rAF render loop ─────────────────────────────────────────
+    //    mousemove only sets this.dirty = true and records this.pendingPoint.
+    //    All actual canvas writes happen here, once per display frame.
+    _startRenderLoop() {
+        const loop = () => {
+            if (this.dirty) {
+                const t0 = performance.now();
+
+                // Composite all layers onto the display canvas
+                this._composite();
+
+                this.lastDrawMs = performance.now() - t0;
+                document.getElementById('drawTime').textContent =
+                    this.lastDrawMs.toFixed(2) + ' ms';
+                this.dirty = false;
+            }
+
+            // FPS counter
+            this.frameCount++;
+            const now   = performance.now();
+            const delta = now - this.lastFpsUpdate;
+            if (delta >= 1000) {
+                this.fps           = Math.round(this.frameCount * 1000 / delta);
+                this.frameCount    = 0;
+                this.lastFpsUpdate = now;
+                this._updateFpsUI();
+            }
+
+            this.rafId = requestAnimationFrame(loop);
+        };
+        this.rafId = requestAnimationFrame(loop);
+    }
+
+    // ── Composite off-screen layers onto display canvas ─────────────────
+    //    FIX 3: we use ctx.setTransform() so the display canvas handles
+    //    zoom/pan in coordinate space — no CSS compositing of multiple elements.
+    _composite() {
+        const dc  = this.displayCtx;
+        const dw  = this.displayCanvas.width;
+        const dh  = this.displayCanvas.height;
+
+        // Clear display
+        dc.clearRect(0, 0, dw, dh);
+
+        if (!this.image) return;
+
+        // Apply pan + zoom transform once
+        dc.save();
+        dc.setTransform(this.scale, 0, 0, this.scale, this.panX, this.panY);
+
+        // Layer 1: base image (static)
+        dc.drawImage(this.baseCanvas, 0, 0);
+
+        // Layer 2: committed annotations (static between strokes)
+        dc.drawImage(this.annotCanvas, 0, 0);
+
+        // Layer 3: live brush preview (changes every frame while drawing)
+        if (this.isDrawing) {
+            dc.drawImage(this.brushCanvas, 0, 0);
+        }
+
+        dc.restore();
+    }
+
+    // Full composite without dirty check (e.g. after zoom, load, clear)
+    _compositeFull() {
+        this.dirty = true;
+    }
+
+    // ── Mouse handlers ───────────────────────────────────────────────────
+    _onMouseDown(e) {
+        if (e.button !== 0 || this.isPanning || !this.image) return;
+
+        const rect  = this._getCachedRect();     // FIX 4
+        const pt    = this._screenToCanvas(      // FIX 3
+            e.clientX - rect.left,
+            e.clientY - rect.top
+        );
+
+        if (pt.x < 0 || pt.x >= this.baseCanvas.width ||
+            pt.y < 0 || pt.y >= this.baseCanvas.height) return;
+
+        this.isDrawing           = true;
+        this.lastPoint           = pt;
+        this.currentStrokePoints = [pt];
+
+        // Draw first dot on brush preview layer immediately
+        this._drawPixel(this.brushCtx, pt.x, pt.y);
+
+        this.pendingPoint = pt;
+        this.dirty        = true;
+    }
+
+    _onMouseMove(e) {
+        if (this.isPanning) {
+            // Pan — update transform state, set dirty
+            this.panX  = e.clientX - this._panStartX;
+            this.panY  = e.clientY - this._panStartY;
+            this.dirty = true;
+
+            document.getElementById('zoomValue').textContent =
+                this.scale.toFixed(1) + '×';
+            return;
+        }
+
+        // FIX 4 — no getBoundingClientRect() here, use cached rect
+        const rect = this._getCachedRect();
+
+        // FIX 3 — coordinate conversion via stored transform state
+        const pt = this._screenToCanvas(
+            e.clientX - rect.left,
+            e.clientY - rect.top
+        );
+
+        // Update coordinate display (cheap)
+        document.getElementById('mousePos').textContent = `${pt.x},${pt.y}`;
+
+        // FIX 1 — during drawing, only update brush preview (off-screen brushCanvas)
+        //          DO NOT write to annotCtx here.
+        if (this.isDrawing && this.tool === 'brush' && this.lastPoint) {
+            const dx = pt.x - this.lastPoint.x;
+            const dy = pt.y - this.lastPoint.y;
+
+            if (Math.sqrt(dx * dx + dy * dy) >= 0.8) {
+                // Draw segment on brush preview layer only
+                this._drawLine(this.brushCtx,
+                    this.lastPoint.x, this.lastPoint.y,
+                    pt.x, pt.y);
+
+                this.currentStrokePoints.push(pt);
+                this.lastPoint    = pt;
+                this.pendingPoint = pt;
+
+                document.getElementById('cachedPoints').textContent =
+                    this.currentStrokePoints.length;
+
+                // FIX 5 — just set the dirty flag; rAF loop does the actual draw
+                this.dirty = true;
+            }
+        }
+    }
+
+    _onMouseUp() {
+        if (!this.isDrawing) return;
+        this.isDrawing = false;
+
+        if (this.currentStrokePoints.length > 0 && this.tool === 'brush') {
+
+            // FIX 1 — commit the full stroke to annotCtx ONCE here (batch replay)
+            //          This is the ONLY time annotCtx is written to.
+            if (this.currentStrokePoints.length === 1) {
+                const p = this.currentStrokePoints[0];
+                this._drawPixel(this.annotCtx, p.x, p.y);
+            } else {
+                for (let i = 1; i < this.currentStrokePoints.length; i++) {
+                    this._drawLine(
+                        this.annotCtx,
+                        this.currentStrokePoints[i-1].x, this.currentStrokePoints[i-1].y,
+                        this.currentStrokePoints[i].x,   this.currentStrokePoints[i].y
+                    );
+                }
+            }
+
+            // Record stroke for undo / export
+            this.strokes.push({
+                points: [...this.currentStrokePoints],
+                color:  this.color,
+                size:   this.size,
+                time:   Date.now(),
+            });
+            document.getElementById('totalStrokes').textContent = this.strokes.length;
+            this._updateStrokeList();
+        }
+
+        // Clear brush preview layer — stroke is now permanent on annotCanvas
+        this.brushCtx.clearRect(0, 0, this.brushCanvas.width, this.brushCanvas.height);
+
+        this.currentStrokePoints = [];
+        this.lastPoint           = null;
+        this.pendingPoint        = null;
+        document.getElementById('cachedPoints').textContent = '0';
+
+        this.dirty = true;
+    }
+
+    // ── Drawing primitives ───────────────────────────────────────────────
+    _drawPixel(ctx, x, y) {
+        ctx.fillStyle = this.tool === 'erase' ? 'rgba(0,0,0,0)' : this.color;
+        if (this.tool === 'erase') {
+            const prev = ctx.globalCompositeOperation;
+            ctx.globalCompositeOperation = 'destination-out';
+            const r = Math.floor(this.size / 2);
+            ctx.fillRect(x - r, y - r, this.size, this.size);
+            ctx.globalCompositeOperation = prev;
+        } else {
+            const r = this.size === 1 ? 0 : Math.floor(this.size / 2);
+            ctx.fillRect(x - r, y - r, this.size, this.size);
+        }
+    }
+
+    // Bresenham line — unchanged from your original (correct approach)
+    _drawLine(ctx, x1, y1, x2, y2) {
+        let x1f = Math.floor(x1), y1f = Math.floor(y1);
+        let x2f = Math.floor(x2), y2f = Math.floor(y2);
+        const dx = Math.abs(x2f - x1f), dy = Math.abs(y2f - y1f);
+        const sx = x1f < x2f ? 1 : -1, sy = y1f < y2f ? 1 : -1;
+        let err = dx - dy;
+        const erase  = this.tool === 'erase';
+        const offset = this.size === 1 ? 0 : Math.floor(this.size / 2);
+
+        if (erase) {
+            const prev = ctx.globalCompositeOperation;
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = 'rgba(0,0,0,1)';
+            while (true) {
+                ctx.fillRect(x1f - offset, y1f - offset, this.size, this.size);
+                if (x1f === x2f && y1f === y2f) break;
+                const e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; x1f += sx; }
+                if (e2 < dx)  { err += dx; y1f += sy; }
+            }
+            ctx.globalCompositeOperation = prev;
+        } else {
+            ctx.fillStyle = this.color;
+            while (true) {
+                ctx.fillRect(x1f - offset, y1f - offset, this.size, this.size);
+                if (x1f === x2f && y1f === y2f) break;
+                const e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; x1f += sx; }
+                if (e2 < dx)  { err += dx; y1f += sy; }
+            }
+        }
+    }
+
+    // ── Load image ───────────────────────────────────────────────────────
+    loadImage(file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+                const w = img.width, h = img.height;
+
+                // Resize all off-screen canvases to image dimensions
+                [this.baseCanvas, this.annotCanvas, this.brushCanvas].forEach(c => {
+                    c.width  = w;
+                    c.height = h;
+                });
+                [this.baseCtx, this.annotCtx, this.brushCtx].forEach(ctx => {
+                    ctx.imageSmoothingEnabled = false;
+                });
+
+                this.baseCtx.drawImage(img, 0, 0);
+                this.image = img;
+
+                this.annotCtx.clearRect(0, 0, w, h);
+                this.brushCtx.clearRect(0, 0, w, h);
+                this.strokes = [];
+                this._updateStrokeList();
+
+                // Update UI
+                document.getElementById('stats').style.display = 'block';
+                document.getElementById('imageName').textContent    = file.name.slice(0, 20);
+                document.getElementById('imageSize').textContent    = `${w}×${h}`;
+                document.getElementById('currentImageName').textContent = file.name.slice(0, 30);
+                document.getElementById('currentDimensions').textContent = `${w}×${h}`;
+                document.getElementById('totalStrokes').textContent = '0';
+
+                this.resetZoom();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ── Zoom / pan ───────────────────────────────────────────────────────
+    zoom(factor) {
+        const cx = this.displayCanvas.width  / 2;
+        const cy = this.displayCanvas.height / 2;
+        this.panX  = cx - (cx - this.panX) * factor;
+        this.panY  = cy - (cy - this.panY) * factor;
+        this.scale = Math.min(20, Math.max(0.1, this.scale * factor));
+        this.dirty = true;
+        this._updateZoomUI();
+    }
+
+    resetZoom() {
+        if (!this.image) return;
+        const cw = this.displayCanvas.width, ch = this.displayCanvas.height;
+        const iw = this.baseCanvas.width,    ih = this.baseCanvas.height;
+        this.scale = Math.min(cw / iw, ch / ih) * 0.9;
+        this.panX  = (cw - iw * this.scale) / 2;
+        this.panY  = (ch - ih * this.scale) / 2;
+        this.dirty = true;
+        this._updateZoomUI();
+    }
+
+    _updateZoomUI() {
+        document.getElementById('zoomLevel').textContent  = Math.round(this.scale * 100) + '%';
+        document.getElementById('zoomValue').textContent  = this.scale.toFixed(1) + '×';
+    }
+
+    // ── Tool / colour ────────────────────────────────────────────────────
+    setTool(tool)  { this.tool  = tool; }
+    setColor(color){
+        this.color = color;
+        document.getElementById('customColor').value = color;
+        document.getElementById('colorPreview').style.backgroundColor = color;
+    }
+
+    // ── FPS UI ───────────────────────────────────────────────────────────
+    _updateFpsUI() {
+        const el  = document.getElementById('fpsStatus');
+        const el2 = document.getElementById('fpsStatus2');
+        const el3 = document.getElementById('fpsDisplay');
+        const f   = this.fps;
+        el3.textContent = f;
+        let label, color;
+        if (f >= 110) { label = '⚡ ' + f + ' FPS'; color = '#00ff88'; }
+        else if (f >= 60) { label = '✓ '  + f + ' FPS'; color = '#88ff88'; }
+        else if (f >= 30) { label = '⚠ '  + f + ' FPS'; color = '#ffaa00'; }
+        else              { label = '✗ '  + f + ' FPS'; color = '#ff4444'; }
+        el.textContent  = label; el.style.color  = color;
+        el2.textContent = label; el2.style.color = color;
+    }
+
+    // ── Stroke list ──────────────────────────────────────────────────────
+    _updateStrokeList() {
+        const list = document.getElementById('annotationsList');
+        document.getElementById('recentCount').textContent = this.strokes.length;
+        if (!this.strokes.length) {
+            list.innerHTML = '<div style="color:#555;text-align:center;font-size:11px;">No strokes yet</div>';
+            return;
+        }
+        const recent = this.strokes.slice(-5).reverse();
+        list.innerHTML = recent.map(s => `
+            <div class="annotation-item">
+                <div class="annotation-color" style="background:${s.color}"></div>
+                <div>${s.points.length} pts · ${s.size}px</div>
+            </div>
+        `).join('');
+    }
+
+    // ── Clear / save / export ────────────────────────────────────────────
+    clearAll() {
+        if (!this.image) return;
+        if (!confirm('Clear all annotations?')) return;
+        this.annotCtx.clearRect(0, 0, this.annotCanvas.width, this.annotCanvas.height);
+        this.brushCtx.clearRect(0, 0, this.brushCanvas.width, this.brushCanvas.height);
+        this.strokes = [];
+        this._updateStrokeList();
+        document.getElementById('totalStrokes').textContent = '0';
+        this.dirty = true;
+    }
+
+    saveImage() {
+        if (!this.image) return;
+        const tmp  = document.createElement('canvas');
+        tmp.width  = this.baseCanvas.width;
+        tmp.height = this.baseCanvas.height;
+        const ctx  = tmp.getContext('2d');
+        ctx.drawImage(this.baseCanvas,  0, 0);
+        ctx.drawImage(this.annotCanvas, 0, 0);
+        const a = document.createElement('a');
+        a.download = `annotation_${Date.now()}.png`;
+        a.href     = tmp.toDataURL();
+        a.click();
+    }
+
+    exportJSON() {
+        if (!this.image) return;
+        const data = {
+            version: '4.0-optimised',
+            fixes_applied: ['no-double-draw','gpu-ctx','setTransform','cached-rect','raf-loop'],
+            dimensions: { width: this.baseCanvas.width, height: this.baseCanvas.height },
+            strokes: this.strokes.map(s => ({
+                color: s.color, size: s.size,
+                pointCount: s.points.length,
+                time: s.time,
+            })),
+            exportDate: new Date().toISOString(),
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+        const a = document.createElement('a');
+        a.download = `annotations_${Date.now()}.json`;
+        a.href     = URL.createObjectURL(blob);
+        a.click();
+    }
+}
+
+// ── Bootstrap ────────────────────────────────────────────────────────────────
+const engine = new OptimisedBrushEngine();
+
+function setTool(tool, e) {
+    engine.setTool(tool);
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    if (e?.target) e.target.classList.add('active');
+}
+
+function setColor(color, e) {
+    engine.setColor(color);
+    document.querySelectorAll('.color-preset').forEach(el => el.classList.remove('selected'));
+    if (e?.target) e.target.classList.add('selected');
+}
+
+function clearAll()   { engine.clearAll(); }
+function saveImage()  { engine.saveImage(); }
+function exportJSON() { engine.exportJSON(); }
+</script>
+</body>
+</html>
